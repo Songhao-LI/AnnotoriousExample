@@ -41,6 +41,7 @@ const OpenSeadragonViewer = dynamic(
   () => import("@annotorious/react").then((mod) => mod.OpenSeadragonViewer),
   { ssr: false }
 );
+import {useAnnotator} from '@annotorious/react';
 
 export default function App() {
   // toolkit
@@ -64,6 +65,18 @@ export default function App() {
     { name: "Filter", tool: undefined, icon: <IoFilter size={22} /> },
   ];
   const [toolItem, setToolItem] = useState<any>(toolkitItems[0]);
+
+  const annotatorInstance = useAnnotator<any>();
+
+  const loadAnnotations = async () => {
+    try {
+      const response = await fetch('/api/annotations');
+      const data = await response.json();
+      annotatorInstance.setAnnotations(data.annotations);
+    } catch (error) {
+      console.error('Error loading annotations:', error);
+    }
+  };
 
   const switchTool = (selectedTool: any | undefined) => {
     setToolItem(selectedTool);
@@ -102,6 +115,13 @@ export default function App() {
             )}
           </div>
         ))}
+        
+        <button
+          onClick={loadAnnotations}
+          className="text-gray-800 hover:text-blue-600 flex items-center px-2 py-1 rounded-md"
+        >
+          Load Data
+        </button>
       </div>
 
       <OpenSeadragonAnnotator
@@ -132,8 +152,6 @@ export default function App() {
           }}
         />
       </OpenSeadragonAnnotator>
-      {/* uncomment this to see the error
-      <OpenSeadragonAnnotationPopup popup={(props) => <div>Hello World</div>} /> */}
     </Annotorious>
   );
 }
