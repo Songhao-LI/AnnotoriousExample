@@ -2,7 +2,7 @@
 
 import "@annotorious/react/annotorious-react.css";
 import dynamic from "next/dynamic";
-import React, { useState } from "react";
+import React, {useEffect, useState} from "react";
 import { FiMove } from "react-icons/fi";
 import { LiaDrawPolygonSolid } from "react-icons/lia";
 import { PiRectangle } from "react-icons/pi";
@@ -23,9 +23,14 @@ and add the require field to the exports section, as shown below:
 */
 
 const Annotorious = dynamic(
-  () => import("@annotorious/react").then((mod) => mod.Annotorious),
+  () => import("@annotorious/react")
+      .then((mod) => {
+                console.log(mod);
+                return mod.Annotorious
+      }),
   { ssr: false }
 );
+
 const OpenSeadragonAnnotator = dynamic(
   () => import("@annotorious/react").then((mod) => mod.OpenSeadragonAnnotator),
   { ssr: false }
@@ -41,7 +46,20 @@ const OpenSeadragonViewer = dynamic(
   () => import("@annotorious/react").then((mod) => mod.OpenSeadragonViewer),
   { ssr: false }
 );
+
 import {useAnnotator} from '@annotorious/react';
+
+function AnnotatorInstanceSetter({ setAnnotatorInstance }: any) {
+  const annotatorInstance = useAnnotator<any>();
+
+  useEffect(() => {
+    if (annotatorInstance) {
+      setAnnotatorInstance(annotatorInstance);
+    }
+  }, [annotatorInstance]);
+
+  return null;
+}
 
 export default function App() {
   // toolkit
@@ -66,21 +84,74 @@ export default function App() {
   ];
   const [toolItem, setToolItem] = useState<any>(toolkitItems[0]);
 
-  const annotatorInstance = useAnnotator<any>();
-
-  const loadAnnotations = async () => {
-    try {
-      const response = await fetch('/api/annotations');
-      const data = await response.json();
-      annotatorInstance.setAnnotations(data.annotations);
-    } catch (error) {
-      console.error('Error loading annotations:', error);
-    }
-  };
+  const [annotatorInstance, setAnnotatorInstance] = useState<any>(null);
 
   const switchTool = (selectedTool: any | undefined) => {
     setToolItem(selectedTool);
   };
+
+  let level_0_width = 50000
+  let level_0_height = 50000
+  let levelCount = 0
+  let scale = 16;
+  const maxLevel = 8;
+  const svs_width = level_0_width * scale;
+  const svs_height = level_0_height * scale;
+  const tile_size = 512;
+  const newTileSource = {
+    width: svs_width,
+    height: svs_height,
+    tileSize: tile_size,
+    tileOverlap: 0,
+    minLevel: 0,
+    maxLevel: maxLevel,
+    getTileUrl: function (level: number, x: number, y: number): string {
+      return `http://127.0.0.1:5000/api/loader/slide/${level}/${x}_${y}.jpeg`;
+    }
+  };
+  const options = {
+    id: "viewer",
+    prefixUrl: "https://openseadragon.github.io/openseadragon/images/",
+    navigatorSizeRatio: 0.25,
+    wrapHorizontal: false,
+    showNavigator: true,
+    showRotationControl: true,
+    showZoomControl: true,
+    tileSources: newTileSource,
+    gestureSettingsMouse: {
+      flickEnabled: true,
+      clickToZoom: false,
+      dblClickToZoom: false
+    },
+    rotationIncrement: 30,
+    gestureSettingsTouch: {
+      pinchRotate: true
+    },
+    animationTime: 0,
+    springStiffness: 100,
+    zoomPerSecond: 1,
+    zoomPerScroll: 1.5,
+    loadTilesWithAjax: true,
+    timeout: 1000000,
+  }
+
+  const loadAnnotations = async () => {
+    try {
+      if (!annotatorInstance) {
+        console.error("Annotator not initialized");
+        return;
+      }
+      console.log("annotationInstance: ", annotatorInstance);
+      const response = await fetch("/api/annotations");
+      console.log("response: ", response);
+      const data = await response.json();
+        console.log("data: ", data);
+      annotatorInstance.setAnnotations(data.annotations);
+    } catch (error) {
+      console.error("Error loading annotations:", error);
+    }
+  };
+
 
   return (
     <Annotorious>
@@ -128,28 +199,10 @@ export default function App() {
         drawingEnabled={toolItem.tool !== undefined}
         tool={toolItem.tool || "rectangle"}
       >
+        <AnnotatorInstanceSetter setAnnotatorInstance={setAnnotatorInstance} />
         <OpenSeadragonViewer
           className="bg-gray-700 w-full h-[calc(100vh-88px)] relative"
-          options={{
-            prefixUrl: "https://openseadragon.github.io/openseadragon/images/",
-            tileSources: {
-              height: 512 * 256,
-              width: 512 * 256,
-              tileSize: 256,
-              minLevel: 8,
-              getTileUrl: function (level, x, y) {
-                return (
-                  "http://s3.amazonaws.com/com.modestmaps.bluemarble/" +
-                  (level - 8) +
-                  "-r" +
-                  y +
-                  "-c" +
-                  x +
-                  ".jpg"
-                );
-              },
-            },
-          }}
+          options={options}
         />
       </OpenSeadragonAnnotator>
     </Annotorious>
